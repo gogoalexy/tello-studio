@@ -23,13 +23,7 @@ This is an example using the Tello SDK v1.3.0.0 and above to receive video strea
 ## Setup
 
 1. Make sure you have all of the above dependencies installed.
-2. Compile libh264decoder:
-2.1. ```sh
-        $ mkdir -p h264decoder/build/
-        $ cd h264decoder/build/
-        $ cmake ../ && make
-        $ cp libh264decoder.so ../../
-
+2. Compile libh264decoder (see readme.md in h264decoder/) and copy libh264decoder.so to the root of this project.
 
 ## Run the project
 - **Step1**. Turn on Tello and connect your computer device to Tello via wifi.
