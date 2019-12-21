@@ -5,10 +5,10 @@ from tello_control_ui import TelloUI
 def main():
 
     drone = tello.Tello('', 8889, imperial=False)  
-    vplayer = TelloUI(drone,"./img/")
+    mainUI = TelloUI(drone)
     
     # start the Tkinter mainloop
-    vplayer.root.mainloop()
+    mainUI.root.mainloop()
 
 if __name__ == "__main__":
     main()
