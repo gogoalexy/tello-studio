@@ -6,6 +6,8 @@ import cv2
 import os
 import time
 import platform
+import multiprocessing
+import sys
 from pathlib import Path
 
 from manual_control_ui import ManualControlUI
@@ -15,6 +17,8 @@ class TelloUI:
 
     def __init__(self, tello):
         self.program_location = os.path.dirname(os.path.abspath(__file__))
+
+        self.script_lock = threading.Lock()
 
         # set default workspace location
         # TODO: read location from tello-studio metadata and create system specific paths
@@ -47,7 +51,10 @@ class TelloUI:
         tb_path.pack(side=LEFT, fill="x", expand="yes")
         
         def update():
-            self.setWorkspaceDialog()
+            path = self.setWorkspaceDialog()
+            # TODO: path needs to have "/" at the end
+            if path:
+                self.workspace = path
             tb_path.delete(0, END)
             tb_path.insert(0, self.workspace)
 
@@ -55,6 +62,8 @@ class TelloUI:
         btn_select.pack(side=RIGHT)
 
         def close():
+            sys.path.append(self.workspace)
+
             top.destroy()
             self.root.deiconify()
 
@@ -63,10 +72,8 @@ class TelloUI:
     
          
     def setWorkspaceDialog(self):
-        path = filedialog.askdirectory(title="Choose workspace directory",
+        return filedialog.askdirectory(title="Choose workspace directory",
                                                  initialdir=str(self.workspace))
-        if path:
-            self.workspace = path
 
     def mainUI(self):
         # set window to full size of screen
@@ -111,31 +118,40 @@ class TelloUI:
 
     def runSelectedScript(self):
         idx = self.lb_scripts.curselection()[0]
-        f = self.scripts[idx]
+        f = self.scripts[idx].split(".")[0]
         print("[INFO] running script", f)
         self.btn_manual_ctl.configure(state=DISABLED)
-        self.btn_run.configure(text="Stop", command=self._closeScriptThread)
+        self.btn_run.configure(text="Stop", command=self._killScript)
 
-        self.script_thr = threading.Thread(target=self._execScript, args=(f,))
-        self.script_thr.run()
-
+        # Spawn new process in seperate thread, to wait for it finishing
+        def runScript():
+            self.script_process = multiprocessing.Process(target=self._execScript, args=(f,))
+            self.script_lock.acquire()
+            self.script_process.start()
+            self.script_process.join()
+            self.script_lock.release()
+            self._scriptCleanup()
+        thread_tmp = threading.Thread(target=lambda: runScript())
+        thread_tmp.start()
+    
     def _execScript(self, f):
-        
         module = __import__(f)
 
-        # TODO: Check module sstructure for validity
+        # TODO: Check module structure for validity
 
-        # Create instance of "mainclass" from imported module
-        instance = module.mainclass(self.tello)
+        # Create instance of "TelloScript" from imported module
+        instance = module.TelloScript(self.tello)
         instance.main()
 
-        self._closeScriptThread(self):
-        
+    def _killScript(self):
+        # If thread is still active, kill it abruptly
+        print("[INFO] Terminating script execution")
+        if self.script_lock.locked():
+            print("tiss alive")
+            self.script_process.kill()
 
-
-    def _closeScriptThread(self):
-        print("[INFO] stoping script execution") 
-        # TODO: if thread is active, kill it abruptly
+    def _scriptCleanup(self):
+        print("[INFO] Script finished")
         self.btn_run.configure(text="Run", command=self.runSelectedScript)
         self.btn_manual_ctl.configure(state=ACTIVE)
 
