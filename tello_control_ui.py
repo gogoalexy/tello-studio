@@ -37,7 +37,7 @@ class TelloUI:
 
     def workspaceSelection(self):
         top = Toplevel()
-        top.title("Slect workspace")
+        top.title("Select workspace")
         top.geometry('500x300')
 
         msg = Message(top, text="Select an existing workspace directory or create a new one.", width=500)
