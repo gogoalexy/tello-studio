@@ -52,8 +52,10 @@ class TelloUI:
         
         def update():
             path = self.setWorkspaceDialog()
-            # TODO: path needs to have "/" at the end
+            # always make sure / is the last character of a path
             if path:
+                if path[:-1] != '/':
+                    path += '/'
                 self.workspace = path
             tb_path.delete(0, END)
             tb_path.insert(0, self.workspace)
