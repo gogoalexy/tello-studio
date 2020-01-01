@@ -2,3 +2,4 @@ __pycache__/
 libh264decoder.so
 h264decoder/build/
 h264decoder/
+.idea/
