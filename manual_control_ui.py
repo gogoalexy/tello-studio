@@ -1,6 +1,4 @@
-
 from tkinter import *
-from tkinter import filedialog
 import threading
 import datetime
 import cv2
@@ -8,6 +6,9 @@ import os
 import time
 import platform
 from pathlib import Path
+from PIL import Image
+from PIL import ImageTk
+
 
 
 class ManualControlUI:
@@ -18,15 +19,20 @@ class ManualControlUI:
         self.tello = tello
         self.outputPath = outputpath # the path that save pictures created by clicking the takeSnapshot button 
         self.frame = None  # frame read from h264decoder and used for pose recognition 
-        self.thread = None # thread of the Tkinter mainloop
+        self.video_thread = None
+        self.control_thread = None
         self.stopEvent = threading.Event()
+        self.imagelabel = None
 
         # if the flag is TRUE,the auto-takeoff thread will stop waiting for the response from tello
         self.quit_waiting_flag = False
 
         # control variables
-        self.distance = 0.1  # default distance for 'move' cmd
-        self.degree = 30  # default degree for 'cw' or 'ccw' cmd
+        self.stateSpeed = 0.5
+        self.stateFB = 0
+        self.stateLR = 0
+        self.stateUD = 0
+        self.stateYAW = 0
 
 
     def _updateGUIImage(self,image):
@@ -34,22 +40,22 @@ class ManualControlUI:
         Main operation to initialize the object of image, and update the GUI panel 
         """  
         image = ImageTk.PhotoImage(image)
-        if self.panel is None:
-            self.panel = Label(image=image)
-            self.panel.image = image
-            self.panel.pack(side="left", padx=10, pady=10)
+        if self.imagelabel is None:
+            self.imagelabel = Label(self.panel, image=image)
+            self.imagelabel.image = image
+            self.imagelabel.pack(side="left", padx=10, pady=10)
         else:
-            self.panel.configure(image=image)
-            self.panel.image = image
+            self.imagelabel.configure(image=image)
+            self.imagelabel.image = image
 
-    def videoLoop(self):
+    def _videoLoop(self):
         """
         The mainloop thread of Tkinter 
         Raises:
             RuntimeError: To get around a RunTime error that Tkinter throws due to threading.
         """
         try:
-            # start the thread that get GUI image and drwa skeleton 
+            # start the thread that get GUI image and draw skeleton 
             time.sleep(0.5)
             #self.sending_command_thread.start()
             while not self.stopEvent.is_set():                
@@ -66,23 +72,29 @@ class ManualControlUI:
                 # we found compatibility problem between Tkinter,PIL and Macos,and it will 
                 # sometimes result the very long preriod of the "ImageTk.PhotoImage" function,
                 # so for Macos,we start a new thread to execute the _updateGUIImage function.
-                if system == "Windows" or system == "Linux":                
+                if system == "Windows" or system == "Linux": 
                     self._updateGUIImage(image)
-
                 else:
                     thread_tmp = threading.Thread(target=self._updateGUIImage,args=(image,))
                     thread_tmp.start()
-                    time.sleep(0.03)                                                            
+                    time.sleep(0.03)                                           
         except RuntimeError as e:
             print("[INFO] caught a RuntimeError")
             
-    def _sendingCommand(self):
-        """
-        start a while loop that sends 'command' to tello every 5 second
-        """    
-        while not self.stopEvent.is_set():                
-            self.tello.send_command('command')        
-            time.sleep(5)
+    def _controlLoop(self):
+        self.tello.send_command("command")
+        skipCommandCounter = 0
+        while not self.stopEvent.is_set():
+            time.sleep(0.05)
+            if self.stateLR == 0 and self.stateFB == 0 and self.stateUD == 0 and self.stateYAW == 0:
+                # Avoid sending 0,0,0,0 alot of times when not active
+                if skipCommandCounter > 1:
+                    continue
+                self.tello.move_rc(0, 0, 0, 0)
+                skipCommandCounter += 1
+            else:
+                self.tello.move_rc(self.stateLR, self.stateFB, self.stateUD, self.stateYAW)
+                skipCommandCounter = 0
 
     def _setQuitWaitingFlag(self):  
         """
@@ -101,28 +113,23 @@ class ManualControlUI:
         # Lock parent window
         self.panel.grab_set()
 
-        btn_snapshot = Button(self.panel, text="Snapshot!",
-                                       command=self.takeSnapshot)
-        btn_snapshot.pack(side="bottom", fill="both",
-                               expand="yes", padx=10, pady=5)
+        # btn_snapshot = Button(self.panel, text="Snapshot!",
+        #                                command=self.takeSnapshot)
+        # btn_snapshot.pack(side="bottom", fill="both",
+        #                        expand="yes", padx=10, pady=5)
 
-        btn_pause = Button(self.panel, text="Pause", relief="raised", command=self.pauseVideo)
-        btn_pause.pack(side="bottom", fill="both",
-                            expand="yes", padx=10, pady=5)
+        # btn_pause = Button(self.panel, text="Pause", relief="raised", command=self.pauseVideo)
+        # btn_pause.pack(side="bottom", fill="both",
+        #                     expand="yes", padx=10, pady=5)
 
         # create text input entry
-        text0 = Label(self.panel,
-                          text='This Controller map keyboard inputs to Tello control commands\n'
-                               'Adjust the trackbar to reset distance and degree parameter',
-                          font='Helvetica 10 bold'
-                          )
-        text0.pack(side='top')
-
         text1 = Label(self.panel, text=
-                          'W - Move Tello Up\t\t\tArrow Up - Move Tello Forward\n'
-                          'S - Move Tello Down\t\t\tArrow Down - Move Tello Backward\n'
-                          'A - Rotate Tello Counter-Clockwise\tArrow Left - Move Tello Left\n'
-                          'D - Rotate Tello Clockwise\t\tArrow Right - Move Tello Right',
+                          'W - Move Up\t\t\tArrow Up - Move Forward\n'
+                          'S - Move Tello Down\t\t\tArrow Down - Move Backward\n'
+                          'A - Rotate Tello Counter-Clockwise\tArrow Left - Move Left\n'
+                          'D - Rotate Tello Clockwise\t\tArrow Right - Move Right\n\n'
+                          'F - Take off\n'
+                          'G - Land',
                           justify="left")
         text1.pack(side="top")
 
@@ -139,48 +146,58 @@ class ManualControlUI:
         # binding arrow keys to drone control
         tmp_f = Frame(self.panel, width=100, height=2)
         tmp_f.bind('<KeyPress-w>', self.on_keypress_w)
+        tmp_f.bind('<KeyRelease-w>', self.on_keyrelease_w)
+
         tmp_f.bind('<KeyPress-s>', self.on_keypress_s)
+        tmp_f.bind('<KeyRelease-s>', self.on_keyrelease_s)
+
         tmp_f.bind('<KeyPress-a>', self.on_keypress_a)
+        tmp_f.bind('<KeyRelease-a>', self.on_keyrelease_a)
+
         tmp_f.bind('<KeyPress-d>', self.on_keypress_d)
+        tmp_f.bind('<KeyRelease-d>', self.on_keyrelease_d)
+
         tmp_f.bind('<KeyPress-Up>', self.on_keypress_up)
+        tmp_f.bind('<KeyRelease-Up>', self.on_keyrelease_up)
+
         tmp_f.bind('<KeyPress-Down>', self.on_keypress_down)
+        tmp_f.bind('<KeyRelease-Down>', self.on_keyrelease_down)
+
         tmp_f.bind('<KeyPress-Left>', self.on_keypress_left)
+        tmp_f.bind('<KeyRelease-Left>', self.on_keyrelease_left)
+
         tmp_f.bind('<KeyPress-Right>', self.on_keypress_right)
+        tmp_f.bind('<KeyRelease-Right>', self.on_keyrelease_right)
+
+        tmp_f.bind('<KeyPress-Right>', self.on_keypress_right)
+        tmp_f.bind('<KeyRelease-Right>', self.on_keyrelease_right)
+
+        tmp_f.bind('<KeyPress-f>', self.on_keypress_f)
+        tmp_f.bind('<KeyPress-g>', self.on_keypress_g)
+
         tmp_f.pack(side="bottom")
         tmp_f.focus_set()
 
-        btn_landing = Button(
+        btn_flip = Button(
             self.panel, text="Flip", relief="raised", command=self.openFlipWindow)
-        btn_landing.pack(side="bottom", fill="both",
+        btn_flip.pack(side="bottom", fill="both",
                               expand="yes", padx=10, pady=5)
 
-        self.distance_bar = Scale(self.panel, from_=0.02, to=5, tickinterval=0.01, digits=3, label='Distance(m)',
-                                  resolution=0.01)
-        self.distance_bar.set(0.2)
-        self.distance_bar.pack(side="left")
-
-        btn_distance = Button(self.panel, text="Reset Distance", relief="raised",
-                                       command=self.updateDistancebar)
-        btn_distance.pack(side="left", fill="both",
-                               expand="yes", padx=10, pady=5)
-
-        self.degree_bar = Scale(self.panel, from_=1, to=360, tickinterval=10, label='Degree')
-        self.degree_bar.set(30)
-        self.degree_bar.pack(side="right")
-
-        btn_distance = Button(self.panel, text="Reset Degree", relief="raised", command=self.updateDegreebar)
-        btn_distance.pack(side="right", fill="both",
-                               expand="yes", padx=10, pady=5)
+        self.speed_bar = Scale(self.panel, from_=0.1, to=3.6, tickinterval=0.1, label='Speed (KPH)', 
+                                resolution=0.1, command=self.updateSpeed)
+        self.speed_bar.set(self.stateSpeed)
+        self.speed_bar.pack(side="right")
         
         # start a thread that constantly pools the video sensor for
         # the most recently read frame
-        self.thread = threading.Thread(target=self.videoLoop, args=())
-        self.thread.start()
+        self.video_thread = threading.Thread(target=self._videoLoop, args=())
+        #self.video_thread.start()
 
-        # TODO: do we really have to send "command" every 5 seconds?
-        # the sending_command will send "command" to tello every 5 seconds
-        #self.sending_command_thread = threading.Thread(target = self._sendingCommand)
-        self.tello.send_command("command")
+        # Start a thread, that sends controller commands to drone based on state.
+        self.control_thread = threading.Thread(target=self._controlLoop, args=())
+        self.control_thread.start()
+
+
 
 
 
@@ -257,78 +274,68 @@ class ManualControlUI:
     def telloFlip_b(self):
         return self.tello.flip('b')
 
-    def telloCW(self, degree):
-        return self.tello.rotate_cw(degree)
-
-    def telloCCW(self, degree):
-        return self.tello.rotate_ccw(degree)
-
-    def telloMoveForward(self, distance):
-        return self.tello.move_forward(distance)
-
-    def telloMoveBackward(self, distance):
-        return self.tello.move_backward(distance)
-
-    def telloMoveLeft(self, distance):
-        return self.tello.move_left(distance)
-
-    def telloMoveRight(self, distance):
-        return self.tello.move_right(distance)
-
-    def telloUp(self, dist):
-        return self.tello.move_up(dist)
-
-    def telloDown(self, dist):
-        return self.tello.move_down(dist)
-
-    def updateTrackBar(self):
-        self.my_tello_hand.setThr(self.hand_thr_bar.get())
-
-    def updateDistancebar(self):
-        self.distance = self.distance_bar.get()
-        print('reset distance to %.1f' % self.distance)
-
-    def updateDegreebar(self):
-        self.degree = self.degree_bar.get()
-        print('reset distance to %d' % self.degree)
+    def updateSpeed(self, event):
+        # Send command to drone to change flying speed
+        speed = self.speed_bar.get()
+        self.stateSpeed = speed
+        self.tello.set_speed(speed)
+        print('reset speed to %d' % speed)
 
     def on_keypress_w(self, event):
-        print("up %d m" % self.distance)
-        self.telloUp(self.distance)
+        self.stateUD = 100
+
+    def on_keyrelease_w(self, event):
+        self.stateUD = 0
 
     def on_keypress_s(self, event):
-        print("down %d m" % self.distance)
-        self.telloDown(self.distance)
+        self.stateUD = -100
+    
+    def on_keyrelease_s(self, event):
+        self.stateUD = 0
 
     def on_keypress_a(self, event):
-        print("ccw %d degree" % self.degree)
-        self.tello.rotate_ccw(self.degree)
+        self.stateYAW = -100
+    
+    def on_keyrelease_a(self, event):
+        self.stateYAW = 0
 
     def on_keypress_d(self, event):
-        print("cw %d m" % self.degree)
-        self.tello.rotate_cw(self.degree)
+        self.stateYAW = 100
+    
+    def on_keyrelease_d(self, event):
+        self.stateYAW = 0
 
     def on_keypress_up(self, event):
-        print("forward %d m" % self.distance)
-        self.telloMoveForward(self.distance)
+        self.stateFB = 100
+    
+    def on_keyrelease_up(self, event):
+        self.stateFB = 0
 
     def on_keypress_down(self, event):
-        print("backward %d m" % self.distance)
-        self.telloMoveBackward(self.distance)
+        self.stateFB = -100
+
+    def on_keyrelease_down(self, event):
+        self.stateFB = 0
 
     def on_keypress_left(self, event):
-        print("left %d m" % self.distance)
-        self.telloMoveLeft(self.distance)
+        self.stateLR = -100
+
+    def on_keyrelease_left(self, event):
+        self.stateLR = 0
 
     def on_keypress_right(self, event):
-        print("right %d m" % self.distance)
-        self.telloMoveRight(self.distance)
+        self.stateLR = 100
 
-    def on_keypress_enter(self, event):
-        if self.frame is not None:
-            self.registerFace()
-        self.tmp_f.focus_set()
-    
+    def on_keyrelease_right(self, event):
+        self.stateLR = 0
+
+    def on_keypress_f(self, event):
+        print('taking off')
+        self.telloTakeOff()
+
+    def on_keypress_g(self, event):
+        self.telloLanding()
+
     def onClose(self):
         print("[INFO] closing manual control UI...")
         self.stopEvent.set()

@@ -131,6 +131,7 @@ class TelloUI:
             self.script_process.join()
             self.script_lock.release()
             self._scriptCleanup()
+
         thread_tmp = threading.Thread(target=lambda: runScript())
         thread_tmp.start()
     
@@ -139,8 +140,18 @@ class TelloUI:
 
         # TODO: Check module structure for validity
 
-        # Create instance of "TelloScript" from imported module
-        instance = module.TelloScript(self.tello)
+        # Create instance of valid class from imported module
+        """if hasattr(module, 'TelloVideoScript'):
+            instance = module.TelloVideoScript(self.tello)
+            # TODO: Spawn new thread, which is gonna update the created scripts object
+            # "frame" attribute
+            thread_video = threading.Thread(target
+        elif hasattr(module, 'TelloScript'):
+            instance = module.TelloScript(self.tello)
+        else:
+            raise AttributeError("Script doesn't contain any valid class.")
+        """
+        instance = module.TelloVideoScript(self.tello)
         instance.main()
 
     def _killScript(self):
@@ -154,6 +165,22 @@ class TelloUI:
         print("[INFO] Script finished")
         self.btn_run.configure(text="Run", command=self.runSelectedScript)
         self.btn_manual_ctl.configure(state=ACTIVE)
+
+    """
+    def videoLoop(video_script):
+        try:
+            time.sleep(0.5)
+            while not self.stopEvent.is_set():                
+                system = platform.system()
+                # read the frame for GUI show
+                frame = self.tello.read()
+                if frame is None or frame.size == 0:
+                    continue 
+                # transfer the format from frame to image         
+                image = Image.fromarray(self.frame)
+        except RuntimeError as e:
+            print("[SCRIPT] caught a RuntimeError in video thread")
+     """
 
     def _updateScripts(self):
         if not os.path.exists(self.workspace):

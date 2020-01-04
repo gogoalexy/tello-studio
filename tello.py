@@ -4,7 +4,7 @@ import time
 import numpy as np
 import libh264decoder
 
-"""Python3"""
+# TODO: check out of range values and throw exceptions accordingly
 
 class Tello:
     """Wrapper class to interact with the Tello drone."""
@@ -377,6 +377,28 @@ class Tello:
             distance = int(round(distance * 100))
 
         return self.send_command('%s %s' % (direction, distance))
+
+    def move_rc(self, lr, fb, ud, yaw):
+        """Move drone according to 4 input channels
+
+        Args:
+            lr (int): left/right (-100 - 100)
+            fb (int): forward/backward (100 - -100)
+            ud (int): up/down (100 - -100)
+            yaw (int): rotation (-100 - 100)
+
+        Returns:
+            str: Response from Tello, 'OK' or 'FALSE'.
+
+        """
+
+        lr = str(lr)
+        fb = str(fb)
+        ud = str(ud)
+        yaw = str(yaw)
+
+        return self.send_command('rc %s %s %s %s' % (lr, fb, ud, yaw))
+
 
     def move_backward(self, distance):
         """Moves backward for a distance.
