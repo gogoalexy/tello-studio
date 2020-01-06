@@ -22,7 +22,7 @@ class TelloUI:
         self.initialiseConfigs()
         # set default workspace location
         # TODO: workspace var should be replaced with DEFAULT_PROJECT_LOCATION
-        self.workspace = self.DEFAULT_PROJECT_LOCATION
+        self.workspace = self.LAST_OPENED_PROJECT
         self.tello = tello
         # initialize the root window and image panel
         self.root = Tk()
@@ -81,7 +81,7 @@ class TelloUI:
         frame.pack(fill="x", padx=10)
 
         tb_path = Entry(frame)
-        tb_path.insert(0, self.workspace + "/new")
+        tb_path.insert(0, self.workspace)# + "/new")
         tb_path.pack(side=LEFT, fill="x", expand="yes")
 
         def update():
@@ -138,8 +138,6 @@ class TelloUI:
         
         last_project_label = Label(third_frame)
         last_project_label.configure(text=last_project_name)
-        #tb_path.delete(0, END)
-        #tb_path.insert(END, "/new")
         #last_project_label.bind("<Button-1>", command=lambda: print("yes"))
         last_project_label.pack(side=LEFT)
 
@@ -152,7 +150,6 @@ class TelloUI:
                 project_file = open(location + "/.tsp", "w+")
                 project_file.write(name)
                 project_file.close()
-
             self.updateLastProjectFile(location)
 
         def close():
@@ -172,26 +169,167 @@ class TelloUI:
     def mainUI(self):
         # set window to full size of screen
         w, h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        self.root.geometry("%dx%d+0+0" % (w, h))
-
         # TODO: check for drone connection
 
+        # Divided into several frames because it's easier to manage layouts this way
         f_top = Frame(self.root, bg="green")
         f_top.pack(fill=X, expand=False)
 
         f_main = Frame(self.root, bg="blue")
         f_main.pack(fill=BOTH, expand=True)
 
+        f_main_left = Frame(f_main, bg="pink")
+        f_main_left.pack(side=LEFT, fill=BOTH, expand=False)
+
+        f_main_right = Frame(f_main, bg="purple")
+        f_main_right.pack(side=LEFT, fill=BOTH, expand=True)
+
         f_bottom = Frame(self.root, bg="red")
         f_bottom.pack(fill=X, expand=False)
 
-        self.lb_scripts = Listbox(f_main, width=35)
-        self.lb_scripts.pack(side=LEFT, fill=Y)
+        f_main_left_top = Frame(f_main_left)
+        f_main_left_top.pack(side=TOP, fill=X)
+
+        # get selected script id from listbox
+        def getSelectedFileId():
+            return self.lb_scripts.curselection()[0]
+        #
+        # These popups are made similarly
+        # - a label clarifying what to do
+        # - an Entry field for supplying text data
+        # - two buttons
+        #
+        # Each has its own method for operating with the files
+        #
+        # popup for creating new files
+        def _popupNewFile():
+            def _createFile(file):
+                if file.split(".")[-1] != "py":
+                    file = file + ".py"
+                Path(self.workspace + "/" + file).touch()
+                self._updateScripts()
+                self._updateScriptsLB()
+                tl_prompt.destroy()
+            # TODO: fix proportions
+            tl_prompt = Toplevel(width=300, height=100)
+            tl_prompt.wm_title("Create new Python file")
+
+            label_rename = Label(tl_prompt, text="New tello Python file:")
+            label_rename.pack(side=TOP, fill=X)
+
+            text_line = Entry(tl_prompt)
+            text_line.pack(side=TOP, fill=X)
+
+            f_rename = Frame(tl_prompt)
+
+            btn_ok = Button(f_rename, text="OK", command=lambda: _createFile(text_line.get()))
+            btn_ok.pack(side=LEFT, fill=X, expand=True)
+            btn_cancel = Button(f_rename, text="Cancel", command=tl_prompt.destroy)
+            btn_cancel.pack(side=LEFT, fill=X, expand=True)
+
+            f_rename.pack(side=TOP, fill=X)
+
+        # popup for renaming files
+        def _popupRenameFile():
+            def _renameFile(file, newname):
+                os.rename(self.workspace + "/" + file, self.workspace + "/" + newname)
+                self._updateScripts()
+                self._updateScriptsLB()
+                tl_prompt.destroy()
+
+            file_id = getSelectedFileId()
+
+            # TODO: fix proportions
+            tl_prompt = Toplevel(width=300, height=100)
+            tl_prompt.wm_title("Rename file")
+
+            label_rename = Label(tl_prompt, text="Rename the file")
+            label_rename.pack(side=TOP, fill=X)
+
+            text_line = Entry(tl_prompt)
+            text_line.insert(INSERT, str(self.scripts[file_id]))
+            text_line.pack(side=TOP, fill=X)
+
+            f_rename = Frame(tl_prompt)
+
+            btn_ok = Button(f_rename, text="OK", command=lambda: _renameFile(self.scripts[file_id], text_line.get()))
+            btn_ok.pack(side=LEFT, fill=X, expand=True)
+            btn_cancel = Button(f_rename, text="Cancel", command=tl_prompt.destroy)
+            btn_cancel.pack(side=LEFT, fill=X, expand=True)
+
+            f_rename.pack(side=TOP, fill=X)
+
+        # popup for deleting a file
+        def _popupDeleteFile():
+            def _deleteFile(file):
+                os.remove(self.workspace + "/" + file)
+                self._updateScripts()
+                self._updateScriptsLB()
+                tl_prompt.destroy()
+
+            file_id = getSelectedFileId()
+
+            # TODO: fix proportions
+            tl_prompt = Toplevel(width=300, height=100)
+            tl_prompt.wm_title("Delete file")
+
+            label_rename = Label(tl_prompt, text="Are you sure you want to delete " + self.scripts[file_id] + "?")
+            label_rename.pack(side=TOP, fill=X)
+
+            f_rename = Frame(tl_prompt)
+
+            btn_ok = Button(f_rename, text="OK", command=lambda: _deleteFile(self.scripts[file_id]))
+            btn_ok.pack(side=LEFT, fill=X, expand=True)
+            btn_cancel = Button(f_rename, text="Cancel", command=tl_prompt.destroy)
+            btn_cancel.pack(side=LEFT, fill=X, expand=True)
+
+            f_rename.pack(side=TOP, fill=X)
+
+        self.btn_new_file = Button(f_main_left_top, relief="raised", text="New File", command=_popupNewFile)
+        self.btn_new_file.pack(side=LEFT, fill=X, expand=True)
+
+        self.btn_new_folder = Button(f_main_left_top, relief="raised", text="New Folder")
+        self.btn_new_folder.pack(side=LEFT, fill=X, expand=True)
+
+        self.lb_scripts = Listbox(f_main_left, width=35)
+        self.lb_scripts.pack(side=BOTTOM, fill=BOTH, expand=True)
 
         self._updateScripts()
         self._updateScriptsLB()
 
-        text_editor = Text(f_main)
+        # file manager listbox popup contents
+        lb_scripts_popup_edit = Menu(self.root, tearoff=False)
+        lb_scripts_popup_edit.add_command(label="New file", command=_popupNewFile)
+        lb_scripts_popup_edit.add_command(label="Rename", command=_popupRenameFile)
+        lb_scripts_popup_edit.add_separator()
+        lb_scripts_popup_edit.add_command(label="Delete", command=_popupDeleteFile)
+
+        self.lb_scripts_popup_exists = False
+
+        # close dirtree listbox popup
+        # i don't know how this shit-show works anymore so DON'T TOUCH
+        # - lb_scripts_close_popup()
+        # - lb_scripts_do_popup()
+        # - self.lb_scripts_popup_exists
+        def lb_scripts_close_popup(popup):
+            if not self.lb_scripts_popup_exists:
+                self.lb_scripts_popup_exists = False
+                popup.grab_release()
+
+        # popup when click on listbox
+        def lb_scripts_do_popup(event, popup):
+            try:
+                self.lb_scripts_popup_exists = True
+                popup.tk_popup(event.x_root, event.y_root, 0)
+            except Exception as e:
+                print(str(e))
+            finally:
+                lb_scripts_close_popup(popup)
+
+        # right click open a popup in the "file manager box" on the left
+        self.lb_scripts.bind("<Button-3>", lambda e: lb_scripts_do_popup(e, lb_scripts_popup_edit))
+
+        text_editor = Text(f_main_right)
         text_editor.pack(side=RIGHT, fill=BOTH, expand=True)
 
         # TODO: why no image is displayed?
@@ -201,6 +339,9 @@ class TelloUI:
 
         self.btn_run = Button(f_top, relief="raised", text="Run", command=self.runSelectedScript)
         self.btn_run.pack(side=LEFT)
+
+        # if user clicks anywhere else than the popup close the popup
+        self.root.bind("<Button-1>", lambda e: lb_scripts_close_popup(lb_scripts_popup_edit))
 
         # set a callback to handle when the window is closed
         self.root.wm_title("Tello Studio")
@@ -291,6 +432,7 @@ class TelloUI:
 
 
     def _updateScriptsLB(self):
+        self.lb_scripts.delete(0, END)
         for script in self.scripts:
             self.lb_scripts.insert(END, script)
 
