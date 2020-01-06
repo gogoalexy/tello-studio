@@ -5,9 +5,9 @@ BUILDDIR=$(pwd)"/h264decoder/build"
 
 # TODO: add support for other operating systems
 if   [[ ${OS} -eq "debian" ]]; then
-    sudo apt install python3-dev libswscale-dev libboost-python-dev cmake gcc python-pip python-tk
+    sudo apt install python3-dev libswscale-dev libboost-python-dev cmake gcc python3-pip python3-tk python3-pil python3-pil.imagetk
 elif [[ ${OS} -eq "arch" ]]; then
-    sudo pacman -Sy python ffmpeg boost-libs cmake gcc pip-python tk
+    sudo pacman -Sy python ffmpeg boost-libs cmake gcc pip-python tk python-pillow
 else
     echo "Unsupported operating system for install script."
     exit 1
