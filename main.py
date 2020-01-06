@@ -4,6 +4,7 @@ from tello_control_ui import TelloUI
 
 def main():
     # Initianile drone interface 
+    drone = None
     drone = tello.Tello('', 8889, imperial=False)  
     
     # start the Tkinter mainloop
