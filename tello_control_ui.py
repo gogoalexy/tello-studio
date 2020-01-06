@@ -139,7 +139,7 @@ class TelloUI:
         last_project_label = Label(third_frame)
         last_project_label.configure(text=last_project_name)
         #tb_path.delete(0, END)
-        tb_path.insert(END, last_project_name)
+        tb_path.insert(END, "/" + last_project_name)
         #last_project_label.bind("<Button-1>", command=lambda: print("yes"))
         last_project_label.pack(side=LEFT)
 
