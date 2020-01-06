@@ -81,7 +81,7 @@ class TelloUI:
         frame.pack(fill="x", padx=10)
 
         tb_path = Entry(frame)
-        tb_path.insert(0, self.workspace) # + "/new")
+        tb_path.insert(0, self.workspace + "/new")
         tb_path.pack(side=LEFT, fill="x", expand="yes")
 
         def update():
@@ -92,7 +92,7 @@ class TelloUI:
                     path += '/'
                 self.workspace = path
             tb_path.delete(0, END)
-            tb_path.insert(0, self.workspace)# + "/new")
+            tb_path.insert(0, self.workspace + "/new")
 
         btn_select = Button(frame, text="...", command=lambda: update())
         btn_select.pack(side=RIGHT)
@@ -112,7 +112,7 @@ class TelloUI:
                 default_project_msg.configure(text="Default project location is set to " + self.DEFAULT_PROJECT_LOCATION)
                 self.workspace = self.DEFAULT_PROJECT_LOCATION
                 tb_path.delete(0, END)
-                tb_path.insert(0, self.workspace)# + "/new")
+                tb_path.insert(0, self.workspace + "/new")
 
         btn_change_default = Button(second_frame, text="Change", command=lambda: updateDefault())
         btn_change_default.pack(side=RIGHT)
@@ -139,7 +139,7 @@ class TelloUI:
         last_project_label = Label(third_frame)
         last_project_label.configure(text=last_project_name)
         #tb_path.delete(0, END)
-        tb_path.insert(END, "/" + last_project_name)
+        #tb_path.insert(END, "/new")
         #last_project_label.bind("<Button-1>", command=lambda: print("yes"))
         last_project_label.pack(side=LEFT)
 
@@ -148,7 +148,7 @@ class TelloUI:
 
         def createOrOpenProjectDir(location, name):
             if not Path(location).is_dir():
-                os.mkdir(location)
+                os.makedirs(location)
                 project_file = open(location + "/.tsp", "w+")
                 project_file.write(name)
                 project_file.close()
