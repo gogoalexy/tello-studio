@@ -285,6 +285,32 @@ class TelloUI:
 
             f_rename.pack(side=TOP, fill=X)
 
+        # set to none when editor is emptied
+        self.file_opened = None
+
+        # TODO: make text editor tabbed lpa
+        # use a list of opened files and a list of contents (Map maybe?)
+        # update UI
+        # save only the currently selected file
+        def openFileInTextEditor():
+            # clean editor
+            text_editor.delete("0.0", END)
+
+            # save full file name to class instance
+            self.file_opened = self.LAST_OPENED_PROJECT + "/" + self.scripts[getSelectedFileId()]
+            file = open(self.file_opened, "r")
+            contents = file.read()
+            text_editor.insert("0.0", contents)
+            file.close()
+
+        # save the opened file if a file has been opened
+        def saveOpenedFile():
+            if self.file_opened:
+                contents = text_editor.get("0.0", END)
+                file = open(self.file_opened, "w")
+                file.write(contents)
+                file.close()
+
         self.btn_new_file = Button(f_main_left_top, relief="raised", text="New File", command=_popupNewFile)
         self.btn_new_file.pack(side=LEFT, fill=X, expand=True)
 
@@ -301,6 +327,7 @@ class TelloUI:
         lb_scripts_popup_edit = Menu(self.root, tearoff=False)
         lb_scripts_popup_edit.add_command(label="New file", command=_popupNewFile)
         lb_scripts_popup_edit.add_command(label="Rename", command=_popupRenameFile)
+        lb_scripts_popup_edit.add_command(label="Open File", command=lambda: openFileInTextEditor())
         lb_scripts_popup_edit.add_separator()
         lb_scripts_popup_edit.add_command(label="Delete", command=_popupDeleteFile)
 
@@ -340,8 +367,15 @@ class TelloUI:
         self.btn_run = Button(f_top, relief="raised", text="Run", command=self.runSelectedScript)
         self.btn_run.pack(side=LEFT)
 
+        # save button
+        btn_save = Button(f_top, relief="raised", text="Save file", command=lambda: saveOpenedFile())
+        btn_save.pack(side=LEFT)
+
         # if user clicks anywhere else than the popup close the popup
         self.root.bind("<Button-1>", lambda e: lb_scripts_close_popup(lb_scripts_popup_edit))
+
+        self.lb_scripts.bind("<Double-Button-1>", lambda e: openFileInTextEditor())
+        self.root.bind("<Control-s>", lambda e: saveOpenedFile())
 
         # set a callback to handle when the window is closed
         self.root.wm_title("Tello Studio")
