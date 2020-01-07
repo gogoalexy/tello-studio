@@ -57,7 +57,6 @@ class ManualControlUI:
         try:
             # start the thread that get GUI image and draw skeleton 
             time.sleep(0.5)
-            #self.sending_command_thread.start()
             while not self.stopEvent.is_set():                
                 system = platform.system()
 
@@ -106,6 +105,9 @@ class ManualControlUI:
         """
         open the cmd window and initial all the button and text
         """     
+        # Open drone connection
+        self.tello.connect()
+
         self.panel = Toplevel(self.root)
         self.panel.wm_title("Command Panel")
         self.panel.wm_protocol("WM_DELETE_WINDOW", self.onClose)
@@ -191,7 +193,7 @@ class ManualControlUI:
         # start a thread that constantly pools the video sensor for
         # the most recently read frame
         self.video_thread = threading.Thread(target=self._videoLoop, args=())
-        #self.video_thread.start()
+        self.video_thread.start()
 
         # Start a thread, that sends controller commands to drone based on state.
         self.control_thread = threading.Thread(target=self._controlLoop, args=())
@@ -257,7 +259,7 @@ class ManualControlUI:
             self.tello.video_freeze(True)
 
     def telloTakeOff(self):
-        return self.tello.takeoff()                
+        return self.tello.takeoff()
 
     def telloLanding(self):
         return self.tello.land()
@@ -278,8 +280,11 @@ class ManualControlUI:
         # Send command to drone to change flying speed
         speed = self.speed_bar.get()
         self.stateSpeed = speed
-        self.tello.set_speed(speed)
         print('reset speed to %d' % speed)
+
+        # Convert KM/h to CM/s
+        speed = int(round(speed * 27.7778))
+        self.tello.set_speed(speed)
 
     def on_keypress_w(self, event):
         self.stateUD = 100
@@ -337,6 +342,7 @@ class ManualControlUI:
         self.telloLanding()
 
     def onClose(self):
+        self.tello.disconnect()
         print("[INFO] closing manual control UI...")
         self.stopEvent.set()
         self.panel.destroy()

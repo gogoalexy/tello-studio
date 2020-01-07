@@ -8,6 +8,7 @@ import time
 import platform
 import multiprocessing
 import sys
+import tello
 from pathlib import Path
 
 from manual_control_ui import ManualControlUI
@@ -15,7 +16,9 @@ from manual_control_ui import ManualControlUI
 
 class TelloUI:
 
-    def __init__(self, tello):
+    def __init__(self):
+        self.drone = tello.Tello('', 8889)
+
         self.program_location = os.path.dirname(os.path.abspath(__file__))
         self.script_lock = threading.Lock()
         # read and apply configs
@@ -23,7 +26,6 @@ class TelloUI:
         # set default workspace location
         # TODO: workspace var should be replaced with DEFAULT_PROJECT_LOCATION
         self.workspace = self.LAST_OPENED_PROJECT
-        self.tello = tello
         # initialize the root window and image panel
         self.root = Tk()
         # hide the root window for now
@@ -382,7 +384,7 @@ class TelloUI:
         self.root.wm_protocol("WM_DELETE_WINDOW", self.onClose)
 
     def openManualControlUI(self):
-        ui = ManualControlUI(self.tello, self.root, self.workspace + 'images/')
+        ui = ManualControlUI(self.drone, self.root, self.workspace + 'images/')
         ui.open()
 
     def runSelectedScript(self):
@@ -408,48 +410,23 @@ class TelloUI:
         module = __import__(f)
 
         # TODO: Check module structure for validity
-
         # Create instance of valid class from imported module
-        """if hasattr(module, 'TelloVideoScript'):
-            instance = module.TelloVideoScript(self.tello)
-            # TODO: Spawn new thread, which is gonna update the created scripts object
-            # "frame" attribute
-            thread_video = threading.Thread(target
-        elif hasattr(module, 'TelloScript'):
-            instance = module.TelloScript(self.tello)
-        else:
-            raise AttributeError("Script doesn't contain any valid class.")
-        """
-        instance = module.TelloVideoScript(self.tello)
-        instance.main()
+        instance = module.TelloScript()
+
+        self.drone.connect()
+        instance.main(self.drone)
+        self.drone.disconnect()
 
     def _killScript(self):
         # If thread is still active, kill it abruptly
         print("[INFO] Terminating script execution")
         if self.script_lock.locked():
-            print("tiss alive")
             self.script_process.kill()
 
     def _scriptCleanup(self):
         print("[INFO] Script finished")
         self.btn_run.configure(text="Run", command=self.runSelectedScript)
         self.btn_manual_ctl.configure(state=ACTIVE)
-
-    """
-    def videoLoop(video_script):
-        try:
-            time.sleep(0.5)
-            while not self.stopEvent.is_set():                
-                system = platform.system()
-                # read the frame for GUI show
-                frame = self.tello.read()
-                if frame is None or frame.size == 0:
-                    continue 
-                # transfer the format from frame to image         
-                image = Image.fromarray(self.frame)
-        except RuntimeError as e:
-            print("[SCRIPT] caught a RuntimeError in video thread")
-     """
 
     def _updateScripts(self):
         if not os.path.exists(self.workspace):
@@ -472,6 +449,5 @@ class TelloUI:
 
     def onClose(self):
         print("[INFO] closing...")
-        del self.tello
         self.root.quit()
 
