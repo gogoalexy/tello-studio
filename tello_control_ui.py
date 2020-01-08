@@ -1,3 +1,4 @@
+import itertools
 from tkinter import *
 from tkinter import filedialog
 import threading
@@ -125,6 +126,7 @@ class TelloUI:
         open_recent_msg = Message(third_frame, text="Open the most recent project", width=500)
         open_recent_msg.pack(side=LEFT)
 
+
         # get name of the last opened/created project
         def getLastProjectName():
             if self.LAST_OPENED_PROJECT == "":
@@ -161,6 +163,11 @@ class TelloUI:
             top.destroy()
             self.root.deiconify()
 
+        # bind enter and escape
+        top.bind("<Return>", lambda e: close())
+        top.bind("<Escape>", lambda e: self.onClose())
+
+
         btn_ok = Button(top, text="OK", command=lambda: close())
         btn_ok.pack(side=BOTTOM)
 
@@ -186,6 +193,9 @@ class TelloUI:
         f_main_right = Frame(f_main, bg="purple")
         f_main_right.pack(side=LEFT, fill=BOTH, expand=True)
 
+        f_main_right_top = Frame(f_main_right, height=2, padx=20)
+        f_main_right_top.pack(side=TOP, fill=BOTH, expand=False)
+
         f_bottom = Frame(self.root, bg="red")
         f_bottom.pack(fill=X, expand=False)
 
@@ -194,8 +204,19 @@ class TelloUI:
 
         # get selected script id from listbox
         def getSelectedFileId():
+            # ce je vec elem od 0
+            if len(self.lb_scripts.curselection()) == 0:
+                return None
             return self.lb_scripts.curselection()[0]
-        #
+
+        def getFileIdByName(name):
+            id = 0
+            for s in self.scripts:
+                if s == name:
+                    return id
+                id += 1
+            return None
+
         # These popups are made similarly
         # - a label clarifying what to do
         # - an Entry field for supplying text data
@@ -206,6 +227,8 @@ class TelloUI:
         # popup for creating new files
         def _popupNewFile():
             def _createFile(file):
+                if file == "":
+                    tl_prompt.destroy()
                 if file.split(".")[-1] != "py":
                     file = file + ".py"
                 Path(self.workspace + "/" + file).touch()
@@ -222,6 +245,8 @@ class TelloUI:
             text_line = Entry(tl_prompt)
             text_line.pack(side=TOP, fill=X)
 
+            text_line.focus_set()
+
             f_rename = Frame(tl_prompt)
 
             btn_ok = Button(f_rename, text="OK", command=lambda: _createFile(text_line.get()))
@@ -230,6 +255,8 @@ class TelloUI:
             btn_cancel.pack(side=LEFT, fill=X, expand=True)
 
             f_rename.pack(side=TOP, fill=X)
+            tl_prompt.bind("<Return>", lambda e: _createFile(text_line.get()))
+            tl_prompt.bind("<Escape>", lambda e: tl_prompt.destroy())
 
         # popup for renaming files
         def _popupRenameFile():
@@ -275,17 +302,20 @@ class TelloUI:
             tl_prompt = Toplevel(width=300, height=100)
             tl_prompt.wm_title("Delete file")
 
-            label_rename = Label(tl_prompt, text="Are you sure you want to delete " + self.scripts[file_id] + "?")
-            label_rename.pack(side=TOP, fill=X)
+            label_delete = Label(tl_prompt, text="Are you sure you want to delete " + self.scripts[file_id] + "?")
+            label_delete.pack(side=TOP, fill=X)
 
-            f_rename = Frame(tl_prompt)
+            f_delete = Frame(tl_prompt)
 
-            btn_ok = Button(f_rename, text="OK", command=lambda: _deleteFile(self.scripts[file_id]))
+            btn_ok = Button(f_delete, text="OK", command=lambda: _deleteFile(self.scripts[file_id]))
             btn_ok.pack(side=LEFT, fill=X, expand=True)
-            btn_cancel = Button(f_rename, text="Cancel", command=tl_prompt.destroy)
+            btn_cancel = Button(f_delete, text="Cancel", command=tl_prompt.destroy)
             btn_cancel.pack(side=LEFT, fill=X, expand=True)
 
-            f_rename.pack(side=TOP, fill=X)
+            f_delete.pack(side=TOP, fill=X)
+
+            tl_prompt.bind("<Return>", lambda e: _deleteFile(self.scripts[file_id]))
+            tl_prompt.bind("<Escape>", lambda e: tl_prompt.destroy())
 
         # set to none when editor is emptied
         self.file_opened = None
@@ -304,6 +334,8 @@ class TelloUI:
             contents = file.read()
             text_editor.insert("0.0", contents)
             file.close()
+            lineCounterLabelUpdate()
+            self.lbl_opened_file_text.set(self.file_opened)
 
         # save the opened file if a file has been opened
         def saveOpenedFile():
@@ -358,8 +390,36 @@ class TelloUI:
         # right click open a popup in the "file manager box" on the left
         self.lb_scripts.bind("<Button-3>", lambda e: lb_scripts_do_popup(e, lb_scripts_popup_edit))
 
-        text_editor = Text(f_main_right)
+        text_editor = Text(f_main_right, font=("Monospace", 12))
         text_editor.pack(side=RIGHT, fill=BOTH, expand=True)
+
+        self.text_editor_lines = 0
+        self.lbl_line_text = StringVar()
+
+        # line counter method and properties
+        def lineCounterLabelUpdate():
+            lines = text_editor.get("0.0", END).count("\n")
+            if self.text_editor_lines != lines:
+                newtext = ""
+                for x in range(1, lines + 2):
+                    newtext += str(x) + "\n"
+                self.lbl_line_text.set(newtext)
+
+        text_editor.bind("<Return>", lambda e: lineCounterLabelUpdate())
+        text_editor.bind("<BackSpace>", lambda e: lineCounterLabelUpdate())
+        text_editor.bind("<Delete>", lambda e: lineCounterLabelUpdate())
+
+        # line counter
+        lbl_line = Label(f_main_right, font=("Monospace", 12), width=2, anchor=NE, justify=RIGHT, textvariable=self.lbl_line_text)
+        lbl_line.pack(side=RIGHT, fill=Y)
+        self.lbl_line_text.set("1\n")
+
+
+
+        self.lbl_opened_file_text = StringVar()
+        self.lbl_opened_file_text.set("No opened files yet")
+        lbl_opened_file = Label(f_main_right_top, height=2, anchor=W, justify=LEFT, textvariable=self.lbl_opened_file_text)
+        lbl_opened_file.pack(side=TOP, fill=X)
 
         # TODO: why no image is displayed?
         img_control = PhotoImage(file='resources/images/control.gif')
@@ -373,15 +433,60 @@ class TelloUI:
         btn_save = Button(f_top, relief="raised", text="Save file", command=lambda: saveOpenedFile())
         btn_save.pack(side=LEFT)
 
+        # get id of selected script from listbox and replace it with -1 if it's NoneType
+        def vimBindGetFileId():
+            id = getSelectedFileId()
+            if id is None:
+                return -1
+            else:
+                return id
+
+        # move selection to upper file
+        def vimBindFileManagerFileUp():
+            id = vimBindGetFileId()
+            if id > 0:
+                id -= 1
+            elif id == -1:
+                id = 0
+            self.lb_scripts.selection_clear(0, END)
+            self.lb_scripts.select_set(id)
+
+        # move selection down
+        def vimBindFileManagerFileDown():
+            id = vimBindGetFileId()
+            if id < len(self.scripts) - 1:
+                id += 1
+            self.lb_scripts.selection_clear(0, END)
+            self.lb_scripts.select_set(id)
+
+        # open selected file
+        def vimBindFileManagerFileOpen():
+            saveOpenedFile()
+            openFileInTextEditor()
+
+        # vim bindings
+        self.root.bind("<Control-j>", lambda e: vimBindFileManagerFileDown())
+        self.root.bind("<Control-k>", lambda e: vimBindFileManagerFileUp())
+        self.root.bind("<Control-l>", lambda e: vimBindFileManagerFileOpen())
+        self.root.bind("<Control-Return>", lambda e: vimBindFileManagerFileOpen())
+
+        self.root.bind("<Control-J>", lambda e: [vimBindFileManagerFileDown(), vimBindFileManagerFileOpen()])
+        self.root.bind("<Control-K>", lambda e: [vimBindFileManagerFileUp(), vimBindFileManagerFileOpen()])
+
+        self.root.bind("<Control-d>", lambda e: _popupDeleteFile())
+        self.root.bind("<Control-N>", lambda e: _popupNewFile())
+
+        # normie bindings
         # if user clicks anywhere else than the popup close the popup
         self.root.bind("<Button-1>", lambda e: lb_scripts_close_popup(lb_scripts_popup_edit))
+        self.root.bind("<Control-s>", lambda e: saveOpenedFile())
 
         self.lb_scripts.bind("<Double-Button-1>", lambda e: openFileInTextEditor())
-        self.root.bind("<Control-s>", lambda e: saveOpenedFile())
 
         # set a callback to handle when the window is closed
         self.root.wm_title("Tello Studio")
         self.root.wm_protocol("WM_DELETE_WINDOW", self.onClose)
+
 
     def openManualControlUI(self):
         ui = ManualControlUI(self.drone, self.root, self.workspace + 'images/')
