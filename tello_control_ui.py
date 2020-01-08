@@ -1,4 +1,3 @@
-import itertools
 from tkinter import *
 from tkinter import filedialog
 import threading
@@ -13,7 +12,6 @@ import tello
 from pathlib import Path
 
 from manual_control_ui import ManualControlUI
-
 
 class TelloUI:
 
@@ -33,7 +31,6 @@ class TelloUI:
         self.root.withdraw()
         # open dialog for workspace selection
         self.workspaceSelection()
-        self.mainUI()
 
     # read config files on startup and set attributes accordingly
     def initialiseConfigs(self):
@@ -56,6 +53,20 @@ class TelloUI:
         self.DEFAULT_PROJECT_LOCATION = open(self.settings_file, "r").read()
         self.LAST_OPENED_PROJECT = open(self.last_project_file, "r").read()
 
+        # based on nord color scheme
+        self.colors = {
+            "black" : "#2e3440",
+            "red"   : "#bf616a",
+            "green" : "#a3be8c",
+            "yellow": "#ebcb8b",
+            "blue"  : "#81a1c1",
+            "purple": "#b48ead",
+            "cyan"  : "#88c0d0",
+            "white" : "#e5e9f0",
+            "grey"  : "#eceff4",
+            "grey2" : "#4c566a"
+        }
+
     # update lastproject config file
     def updateLastProjectFile(self, last_project_location):
         project_file = open(self.last_project_file, "w")
@@ -72,41 +83,77 @@ class TelloUI:
 
         self.DEFAULT_PROJECT_LOCATION = str(default_project_location)
 
+    # get name of the last opened/created project
+    def getLastProjectName(self):
+        # initial run
+        if self.LAST_OPENED_PROJECT == "":
+            return "No known projects yet"
+        else:
+            appendix = ".tsp"
+            if self.LAST_OPENED_PROJECT[-1] != "/":
+                appendix = "/.tsp"
+            if Path(self.LAST_OPENED_PROJECT + appendix).exists():
+                # in this case we found the last project file
+                last_project_file = open(self.LAST_OPENED_PROJECT + appendix, "r")
+                content = last_project_file.read()
+                last_project_file.close()
+                return content
+            else:
+                # in this case the folder was deleted so replace with default message
+                self.updateLastProjectFile("")
+                return "No previous projects found"
+
     def workspaceSelection(self):
-        top = Toplevel()
+        top = Toplevel(bg=self.colors["white"])
         top.title("Select workspace")
         top.geometry('500x300')
 
-        msg = Message(top, text="Select an existing workspace directory or create a new one.", width=500)
-        msg.pack(side=TOP)
+        msg = Message(top, padx=10, pady=30, anchor=N,
+                      text="Select an existing workspace directory or create a new one.",
+                      width=500,
+                      bg=self.colors["white"],
+                      fg=self.colors["black"],
+                      font=("Monospace", 14))
+        msg.pack(side=TOP, fill=X)
 
-        frame = Frame(top)
+        frame = Frame(top, bg=self.colors["white"])
         frame.pack(fill="x", padx=10)
 
-        tb_path = Entry(frame)
-        tb_path.insert(0, self.workspace)# + "/new")
+        tb_path = Entry(frame, bg=self.colors["grey"])
+        tb_path.insert(0, self.workspace)
         tb_path.pack(side=LEFT, fill="x", expand="yes")
 
-        def update():
-            path = self.setWorkspaceDialog("Choose workspace directory")
-            # always make sure / is the last character of a path
+        # set workspace and textbox content to path
+        def updateCurrentProject(path):
+            # NOT always make sure / is the last character of a path
             if path:
-                if path[:-1] != '/':
-                    path += '/'
+            #    if path[:-1] != '/':
+            #        path += '/'
                 self.workspace = path
             tb_path.delete(0, END)
-            tb_path.insert(0, self.workspace + "/new")
+            tb_path.insert(0, self.workspace)
 
-        btn_select = Button(frame, text="...", command=lambda: update())
+        # open a window that updates the current dir
+        def updateCurrentProjectDialog():
+            path = self.setWorkspaceDialog("Choose workspace directory")
+            updateCurrentProject(path)
+
+        updateCurrentProject(self.DEFAULT_PROJECT_LOCATION + "/new")
+
+        btn_select = Button(frame,
+                            text="...",
+                            command=lambda: updateCurrentProjectDialog(),
+                            bg=self.colors["green"])
+
         btn_select.pack(side=RIGHT)
 
-        second_frame = Frame(top)
+        second_frame = Frame(top, bg=self.colors["white"])
         second_frame.pack(fill="x", padx=10)
 
-        default_project_msg = Message(second_frame, text="Default project location is set to " + self.DEFAULT_PROJECT_LOCATION, width=500)
+        default_project_msg = Message(second_frame, bg=self.colors["white"], text="Default project location is set to " + self.DEFAULT_PROJECT_LOCATION, width=500)
         default_project_msg.pack(side=LEFT)
 
-        # update default project location
+        # update default project location - WORKS
         def updateDefault():
             path = self.setWorkspaceDialog("Choose default project folder")
             if not path == '':
@@ -117,30 +164,19 @@ class TelloUI:
                 tb_path.delete(0, END)
                 tb_path.insert(0, self.workspace + "/new")
 
-        btn_change_default = Button(second_frame, text="Change", command=lambda: updateDefault())
+        btn_change_default = Button(second_frame, bg=self.colors["green"], text="Change", command=lambda: updateDefault())
         btn_change_default.pack(side=RIGHT)
 
-        third_frame = Frame(top)
+        third_frame = Frame(top, bg=self.colors["white"])
         third_frame.pack(fill="x", padx=10)
 
-        open_recent_msg = Message(third_frame, text="Open the most recent project", width=500)
+        open_recent_msg = Message(third_frame, bg=self.colors["white"], text="Open the most recent project", width=500)
         open_recent_msg.pack(side=LEFT)
 
-
-        # get name of the last opened/created project
-        def getLastProjectName():
-            if self.LAST_OPENED_PROJECT == "":
-                return "No known projects yet"
-            else:
-                if Path(self.LAST_OPENED_PROJECT + "/.tsp").exists():
-                    last_project_file = open(self.LAST_OPENED_PROJECT + "/.tsp", "r")
-                    return last_project_file.read()
-                else:
-                    self.updateLastProjectFile("")
-                    return "No known projects yet"
-        last_project_name = getLastProjectName()
+        # starts feeling yanky about here
+        last_project_name = self.getLastProjectName()
         
-        last_project_label = Label(third_frame)
+        last_project_label = Label(third_frame, bg=self.colors["white"])
         last_project_label.configure(text=last_project_name)
         #last_project_label.bind("<Button-1>", command=lambda: print("yes"))
         last_project_label.pack(side=LEFT)
@@ -150,30 +186,37 @@ class TelloUI:
 
         def createOrOpenProjectDir(location, name):
             if not Path(location).is_dir():
+                # if project dir does not exist create dir and .tsp file in it
                 os.makedirs(location)
                 project_file = open(location + "/.tsp", "w+")
                 project_file.write(name)
                 project_file.close()
+
             self.updateLastProjectFile(location)
 
         def close():
             # TODO: make this more elegant... Prompt for project name / set later?
-            createOrOpenProjectDir(tb_path.get(), tb_path.get().split("/")[-1])
+            # hacky way to get last value from textbox
+            path = tb_path.get()
+            if path[-1] == "/":
+                path = path[:-1]
+
+            createOrOpenProjectDir(path, path.split("/")[-1])
+            self.workspace = path
             sys.path.append(self.workspace)
             top.destroy()
             self.root.deiconify()
+            self.mainUI()
 
         # bind enter and escape
         top.bind("<Return>", lambda e: close())
         top.bind("<Escape>", lambda e: self.onClose())
 
-
-        btn_ok = Button(top, text="OK", command=lambda: close())
+        btn_ok = Button(top, bg=self.colors["green"], text="OK", command=lambda: close())
         btn_ok.pack(side=BOTTOM)
 
     def setWorkspaceDialog(self, title_str):
         return filedialog.askdirectory(title=title_str, initialdir=str(self.workspace))
-
 
     def mainUI(self):
         # set window to full size of screen
@@ -181,26 +224,58 @@ class TelloUI:
         # TODO: check for drone connection
 
         # Divided into several frames because it's easier to manage layouts this way
-        f_top = Frame(self.root, bg="green")
+        f_top = Frame(self.root, bg=self.colors["black"])
         f_top.pack(fill=X, expand=False)
 
-        f_main = Frame(self.root, bg="blue")
+        f_main = Frame(self.root, bg=self.colors["green"])
         f_main.pack(fill=BOTH, expand=True)
 
-        f_main_left = Frame(f_main, bg="pink")
+        f_main_left = Frame(f_main, bg=self.colors["black"])
         f_main_left.pack(side=LEFT, fill=BOTH, expand=False)
 
-        f_main_right = Frame(f_main, bg="purple")
+        f_main_right = Frame(f_main, bg=self.colors["black"])
         f_main_right.pack(side=LEFT, fill=BOTH, expand=True)
 
-        f_main_right_top = Frame(f_main_right, height=2, padx=20)
+        f_main_right_top = Frame(f_main_right,
+                                 bg=self.colors["black"],
+                                 height=2, padx=20)
         f_main_right_top.pack(side=TOP, fill=BOTH, expand=False)
 
-        f_bottom = Frame(self.root, bg="red")
+        f_bottom = Frame(self.root)
         f_bottom.pack(fill=X, expand=False)
 
-        f_main_left_top = Frame(f_main_left)
+        f_main_left_top = Frame(f_main_left,
+                                bg=self.colors["black"])
         f_main_left_top.pack(side=TOP, fill=X)
+
+        def _popupDisplayHelp():
+            tl_help = Toplevel(width=300, height=100)
+            tl_help.wm_title("Help!")
+            lbl_title = Label(tl_help, text="Thank you for trying out Tello Studio", font=("Monospace", 18))
+            lbl_title.pack(side=TOP, fill=X)
+
+            help_msg = "Shortcuts (mainly Vim based):\n" \
+                       "- Ctrl + [ j | k ]              Move up and down the file list\n" \
+                       "- Ctrl + l                      Open the selected file in file list\n" \
+                       "- Ctrl + Shift + [ j | k ]      Move up and down the file list and open selected file immediately\n" \
+                       "- Ctrl + Shift + n              Create new file\n"\
+                       "- Ctrl + d                      Delete selected file\n"
+
+            lbl_help = Label(tl_help, text=help_msg, justify=LEFT, font=("Monospace", 11))
+            lbl_help.pack(side=TOP)
+
+            btn_close = Button(tl_help, text="Close", command=tl_help.destroy)
+            btn_close.pack(side=TOP, fill=X, expand=True)
+
+            tl_help.bind("<Return>", lambda e: tl_help.destroy())
+
+        help_btn = Button(f_top,
+                          text="Help?",
+                          bg=self.colors["grey2"],
+                          fg=self.colors["white"],
+                          highlightthickness=0,
+                          command=_popupDisplayHelp)
+        help_btn.pack(side=RIGHT)
 
         # get selected script id from listbox
         def getSelectedFileId():
@@ -208,14 +283,6 @@ class TelloUI:
             if len(self.lb_scripts.curselection()) == 0:
                 return None
             return self.lb_scripts.curselection()[0]
-
-        def getFileIdByName(name):
-            id = 0
-            for s in self.scripts:
-                if s == name:
-                    return id
-                id += 1
-            return None
 
         # These popups are made similarly
         # - a label clarifying what to do
@@ -345,20 +412,40 @@ class TelloUI:
                 file.write(contents)
                 file.close()
 
-        self.btn_new_file = Button(f_main_left_top, relief="raised", text="New File", command=_popupNewFile)
+        lbl_project_name = Label(f_main_left_top,
+                                 text="Project name: " + self.getLastProjectName(),
+                                 bg=self.colors["black"],
+                                 fg=self.colors["white"],
+                                 height=2,
+                                 anchor=W,
+                                 justify=LEFT)
+        lbl_project_name.pack(side=TOP, fill=X)
+
+        self.btn_new_file = Button(f_main_left_top, relief="raised",
+                                   bg=self.colors["grey2"],
+                                   fg=self.colors["white"],
+                                   borderwidth=0,
+                                   highlightthickness=0,
+                                   text="New File",
+                                   command=_popupNewFile)
         self.btn_new_file.pack(side=LEFT, fill=X, expand=True)
 
-        self.btn_new_folder = Button(f_main_left_top, relief="raised", text="New Folder")
-        self.btn_new_folder.pack(side=LEFT, fill=X, expand=True)
-
-        self.lb_scripts = Listbox(f_main_left, width=35)
+        self.lb_scripts = Listbox(f_main_left,
+                                  bg=self.colors["grey"],
+                                  fg=self.colors["black"],
+                                  highlightthickness=0,
+                                  width=35)
         self.lb_scripts.pack(side=BOTTOM, fill=BOTH, expand=True)
 
         self._updateScripts()
         self._updateScriptsLB()
 
         # file manager listbox popup contents
-        lb_scripts_popup_edit = Menu(self.root, tearoff=False)
+        lb_scripts_popup_edit = Menu(self.root,
+                                     #highlightthickness=0,
+                                     bg=self.colors["black"],
+                                     fg=self.colors["yellow"],
+                                     tearoff=False)
         lb_scripts_popup_edit.add_command(label="New file", command=_popupNewFile)
         lb_scripts_popup_edit.add_command(label="Rename", command=_popupRenameFile)
         lb_scripts_popup_edit.add_command(label="Open File", command=lambda: openFileInTextEditor())
@@ -390,7 +477,11 @@ class TelloUI:
         # right click open a popup in the "file manager box" on the left
         self.lb_scripts.bind("<Button-3>", lambda e: lb_scripts_do_popup(e, lb_scripts_popup_edit))
 
-        text_editor = Text(f_main_right, font=("Monospace", 12))
+        text_editor = Text(f_main_right,
+                           bg=self.colors["grey2"],
+                           fg=self.colors["white"],
+                           highlightthickness=0,
+                           font=("Monospace", 12))
         text_editor.pack(side=RIGHT, fill=BOTH, expand=True)
 
         self.text_editor_lines = 0
@@ -410,28 +501,68 @@ class TelloUI:
         text_editor.bind("<Delete>", lambda e: lineCounterLabelUpdate())
 
         # line counter
-        lbl_line = Label(f_main_right, font=("Monospace", 12), width=2, anchor=NE, justify=RIGHT, textvariable=self.lbl_line_text)
+        lbl_line = Label(f_main_right,
+                         font=("Monospace", 12),
+                         bg=self.colors["black"],
+                         fg=self.colors["yellow"],
+                         pady=2, width=2, anchor=NE,
+                         justify=RIGHT,
+                         textvariable=self.lbl_line_text)
         lbl_line.pack(side=RIGHT, fill=Y)
         self.lbl_line_text.set("1\n")
 
-
-
         self.lbl_opened_file_text = StringVar()
         self.lbl_opened_file_text.set("No opened files yet")
-        lbl_opened_file = Label(f_main_right_top, height=2, anchor=W, justify=LEFT, textvariable=self.lbl_opened_file_text)
+        lbl_opened_file = Label(f_main_right_top,
+                                bg=self.colors["black"],
+                                fg=self.colors["yellow"],
+                                height=2, anchor=W, justify=LEFT, textvariable=self.lbl_opened_file_text)
         lbl_opened_file.pack(side=TOP, fill=X)
 
         # TODO: why no image is displayed?
         img_control = PhotoImage(file='resources/images/control.gif')
-        self.btn_manual_ctl = Button(f_top, relief="raised", text="M", command=self.openManualControlUI)
+        self.btn_manual_ctl = Button(f_top,
+                                     bg=self.colors["black"],
+                                     fg=self.colors["red"],
+                                     #relief="raised",
+                                     #highlightcolor=self.colors["grey"],
+                                     highlightthickness=0,
+                                     text="M",
+                                     command=self.openManualControlUI)
         self.btn_manual_ctl.pack(side=LEFT)
 
-        self.btn_run = Button(f_top, relief="raised", text="Run", command=self.runSelectedScript)
+        self.btn_run = Button(f_top,
+                              bg=self.colors["black"],
+                              fg=self.colors["white"],
+                              relief="raised",
+                              text="Run",
+                              highlightthickness=0,
+                              command=self.runSelectedScript)
         self.btn_run.pack(side=LEFT)
 
         # save button
-        btn_save = Button(f_top, relief="raised", text="Save file", command=lambda: saveOpenedFile())
+        btn_save = Button(f_top,
+                          bg=self.colors["black"],
+                          fg=self.colors["white"],
+                          relief="raised",
+                          text="Save file",
+                          highlightthickness=0,
+                          command=lambda: saveOpenedFile())
         btn_save.pack(side=LEFT)
+
+        def _openAnother():
+           saveOpenedFile()
+           self.workspaceSelection()
+
+        # save button
+        btn_open_other_project = Button(f_top,
+                                        bg=self.colors["black"],
+                                        fg=self.colors["white"],
+                                        relief="raised",
+                                        text="Open another project",
+                                        highlightthickness=0,
+                                        command=lambda: _openAnother())
+        btn_open_other_project.pack(side=LEFT)
 
         # get id of selected script from listbox and replace it with -1 if it's NoneType
         def vimBindGetFileId():
@@ -480,13 +611,13 @@ class TelloUI:
         # if user clicks anywhere else than the popup close the popup
         self.root.bind("<Button-1>", lambda e: lb_scripts_close_popup(lb_scripts_popup_edit))
         self.root.bind("<Control-s>", lambda e: saveOpenedFile())
-
+        self.root.bind("<Control-r>", lambda e: self.runSelectedScript())
+        self.root.bind("<F1>", lambda e: _popupDisplayHelp())
         self.lb_scripts.bind("<Double-Button-1>", lambda e: openFileInTextEditor())
 
         # set a callback to handle when the window is closed
         self.root.wm_title("Tello Studio")
         self.root.wm_protocol("WM_DELETE_WINDOW", self.onClose)
-
 
     def openManualControlUI(self):
         ui = ManualControlUI(self.drone, self.root, self.workspace + 'images/')
@@ -555,4 +686,3 @@ class TelloUI:
     def onClose(self):
         print("[INFO] closing...")
         self.root.quit()
-
