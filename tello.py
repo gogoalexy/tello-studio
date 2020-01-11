@@ -165,7 +165,8 @@ class Tello:
         print((">> send cmd: {}".format(command)))
         self.abort_flag = False
         timer = threading.Timer(self.command_timeout, self.set_abort_flag)
-
+    
+        self.response = None
         self.socket.sendto(command.encode('utf-8'), self.tello_address)
 
         timer.start()
@@ -175,13 +176,14 @@ class Tello:
         timer.cancel()
         
         if self.response is None:
-            response = 'none_response'
+            print('Response to command \"{}\" timed out.'.format(command))
+            response = 'timeout'
         else:
+            print('Response to command \"{}\": {}'.format(command, self.response))
             response = self.response.decode('latin-1')
+        
 
         self.response = None
-
-        print(response)
         return response
     
     def set_abort_flag(self):

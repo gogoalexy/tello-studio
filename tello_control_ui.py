@@ -658,6 +658,7 @@ class TelloUI:
         # Create instance of valid class from imported module
         instance = module.TelloScript()
 
+        self.drone.command_timeout = 5.0
         self.drone.connect()
         instance.main(self.drone)
         self.drone.disconnect()

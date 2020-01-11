@@ -108,6 +108,7 @@ class ManualControlUI:
         open the cmd window and initial all the button and text
         """     
         # Open drone connection
+        self.tello.timeout = 0.3
         self.tello.connect()
 
         self.panel = Toplevel(self.root)

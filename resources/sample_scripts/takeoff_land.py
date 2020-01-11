@@ -7,8 +7,11 @@ class TelloScript():
         # Send "command" to tello to enable command mode.
         tello.send_command("command")
 
-        # Takeoff and stay in air for 5s
-        tello.takeoff(delay=5)
+        # Takeoff
+        tello.takeoff()
+
+        # Stay in air for 5 seconds
+        time.sleep(5)
 
         # Land
         tello.land()
