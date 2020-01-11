@@ -500,6 +500,14 @@ class TelloUI:
         text_editor.bind("<BackSpace>", lambda e: lineCounterLabelUpdate())
         text_editor.bind("<Delete>", lambda e: lineCounterLabelUpdate())
 
+        # replace tabs with 4 spaces 
+        def manageTab(arg):
+            print("[INFO] Tab pressed, replacing with 4 spaces")
+            text_editor.insert(INSERT, " " * 4)
+            return "break"
+
+        text_editor.bind("<Tab>", manageTab)
+
         # line counter
         lbl_line = Label(f_main_right,
                          font=("Monospace", 12),
