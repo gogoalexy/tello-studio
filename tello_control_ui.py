@@ -621,6 +621,7 @@ class TelloUI:
 
     def openManualControlUI(self):
         ui = ManualControlUI(self.drone, self.root, self.workspace + 'images/')
+        print("[INFO] opening manual control UI")
         ui.open()
 
     def runSelectedScript(self):

@@ -10,7 +10,6 @@ from PIL import Image
 from PIL import ImageTk
 
 
-
 class ManualControlUI:
     """Wrapper class to enable the GUI."""
 
@@ -33,6 +32,9 @@ class ManualControlUI:
         self.stateLR = 0
         self.stateUD = 0
         self.stateYAW = 0
+
+        # control flag for flip window
+        self.flip_opened = False
 
 
     def _updateGUIImage(self,image):
@@ -207,29 +209,44 @@ class ManualControlUI:
         """
         open the flip window and initial all the button and text
         """
-        
-        panel = Toplevel(self.root)
-        panel.wm_title("Gesture Recognition")
 
-        self.btn_flipl = Button(
-            panel, text="Flip Left", relief="raised", command=self.telloFlip_l)
-        self.btn_flipl.pack(side="bottom", fill="both",
-                            expand="yes", padx=10, pady=5)
+        # check if window is already opened
+        if self.flip_opened == True:
+            print("[INFO] Flip window is already opened!")
+            return
+        else:
+            panel = Toplevel(self.root)
+            panel.wm_title("Gesture Recognition")
 
-        self.btn_flipr = Button(
-            panel, text="Flip Right", relief="raised", command=self.telloFlip_r)
-        self.btn_flipr.pack(side="bottom", fill="both",
-                            expand="yes", padx=10, pady=5)
+            def on_closing():
+                print("[INFO] Closing flip window")
+                panel.destroy()
+                self.flip_opened = False
 
-        self.btn_flipf = Button(
-            panel, text="Flip Forward", relief="raised", command=self.telloFlip_f)
-        self.btn_flipf.pack(side="bottom", fill="both",
-                            expand="yes", padx=10, pady=5)
+            self.btn_flipl = Button(
+                panel, text="Flip Left", relief="raised", command=self.telloFlip_l)
+            self.btn_flipl.pack(side="bottom", fill="both",
+                                expand="yes", padx=10, pady=5)
 
-        self.btn_flipb = Button(
-            panel, text="Flip Backward", relief="raised", command=self.telloFlip_b)
-        self.btn_flipb.pack(side="bottom", fill="both",
-                            expand="yes", padx=10, pady=5)
+            self.btn_flipr = Button(
+                panel, text="Flip Right", relief="raised", command=self.telloFlip_r)
+            self.btn_flipr.pack(side="bottom", fill="both",
+                                expand="yes", padx=10, pady=5)
+
+            self.btn_flipf = Button(
+                panel, text="Flip Forward", relief="raised", command=self.telloFlip_f)
+            self.btn_flipf.pack(side="bottom", fill="both",
+                                expand="yes", padx=10, pady=5)
+
+            self.btn_flipb = Button(
+                panel, text="Flip Backward", relief="raised", command=self.telloFlip_b)
+            self.btn_flipb.pack(side="bottom", fill="both",
+                                expand="yes", padx=10, pady=5)
+
+            self.flip_opened = True
+
+            panel.protocol("WM_DELETE_WINDOW", on_closing)
+
        
     def takeSnapshot(self):
         """
