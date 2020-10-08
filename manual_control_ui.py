@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image
 from PIL import ImageTk
 
+from logger import DataLogger, Recorder
 
 class ManualControlUI:
     """Wrapper class to enable the GUI."""
@@ -17,6 +18,8 @@ class ManualControlUI:
         self.root = root
         self.tello = tello
         self.outputPath = outputpath # the path that save pictures created by clicking the takeSnapshot button 
+        self.log = DataLogger(tello, self.outputPath)
+        self.rec = Recorder(self.outputPath)
         self.frame = None  # frame read from h264decoder and used for pose recognition 
         self.video_thread = None
         self.control_thread = None
@@ -67,9 +70,10 @@ class ManualControlUI:
                 if self.frame is None or self.frame.size == 0:
                     continue 
             
-                # transfer the format from frame to image         
+                # transfer the format from frame to image     
+                self.log.log_data()    
                 image = Image.fromarray(self.frame)
-
+                self.rec.write(self.frame)
                 # we found compatibility problem between Tkinter,PIL and Macos,and it will 
                 # sometimes result the very long preriod of the "ImageTk.PhotoImage" function,
                 # so for Macos,we start a new thread to execute the _updateGUIImage function.
@@ -305,49 +309,49 @@ class ManualControlUI:
         self.tello.set_speed(speed)
 
     def on_keypress_w(self, event):
-        self.stateUD = 100
+        self.stateUD = 50
 
     def on_keyrelease_w(self, event):
         self.stateUD = 0
 
     def on_keypress_s(self, event):
-        self.stateUD = -100
+        self.stateUD = -50
     
     def on_keyrelease_s(self, event):
         self.stateUD = 0
 
     def on_keypress_a(self, event):
-        self.stateYAW = -100
+        self.stateYAW = -50
     
     def on_keyrelease_a(self, event):
         self.stateYAW = 0
 
     def on_keypress_d(self, event):
-        self.stateYAW = 100
+        self.stateYAW = 50
     
     def on_keyrelease_d(self, event):
         self.stateYAW = 0
 
     def on_keypress_up(self, event):
-        self.stateFB = 100
+        self.stateFB = 50
     
     def on_keyrelease_up(self, event):
         self.stateFB = 0
 
     def on_keypress_down(self, event):
-        self.stateFB = -100
+        self.stateFB = -50
 
     def on_keyrelease_down(self, event):
         self.stateFB = 0
 
     def on_keypress_left(self, event):
-        self.stateLR = -100
+        self.stateLR = -50
 
     def on_keyrelease_left(self, event):
         self.stateLR = 0
 
     def on_keypress_right(self, event):
-        self.stateLR = 100
+        self.stateLR = 50
 
     def on_keyrelease_right(self, event):
         self.stateLR = 0
@@ -363,6 +367,8 @@ class ManualControlUI:
         self.tello.disconnect()
         print("[INFO] closing manual control UI...")
         self.stopEvent.set()
+        self.log.close()
+        self.rec.close()
         self.panel.destroy()
         
 

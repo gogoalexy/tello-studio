@@ -33,6 +33,7 @@ class Tello:
         self.tello_address = (tello_ip, tello_port)
         self.local_video_port = 11111  # port for receiving video stream
         self.last_height = 0
+        self.sdk = 0.0
         
     def __del__(self):
         self.disconnect()
@@ -56,6 +57,13 @@ class Tello:
        
         # TODO 
         time.sleep(5)
+        
+        self.socket.sendto(b'moff', self.tello_address)
+        print('sent: moff')
+
+        # check sdk version
+        self.sdk = self.get_sdk_version()
+        print("[INFO] Tello SDK version: {}".format(self.sdk))
         
         if streamon:
             self.socket.sendto(b'streamon', self.tello_address)
@@ -283,6 +291,21 @@ class Tello:
 
         """
         return self.response
+
+    def get_sdk_version(self):
+        """Returns Tello SDK version.
+
+        Returns:
+            float: Version of SDK.
+
+        """
+        sdk = self.send_command('sdk?')
+        try:
+            sdk = sdk[:0] + '.' + sdk[1:]
+            sdk = float(sdk)
+        except:
+            pass
+        return sdk
 
     def get_height(self):
         """Returns height(dm) of tello.

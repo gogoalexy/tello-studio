@@ -16,7 +16,7 @@ from manual_control_ui import ManualControlUI
 class TelloUI:
 
     def __init__(self):
-        self.drone = tello.Tello('', 8889)
+        self.drone = tello.Tello('', 8890)
 
         self.program_location = os.path.dirname(os.path.abspath(__file__))
         self.script_lock = threading.Lock()
